@@ -1,2 +1,2 @@
-@py C:\Users\Username\MyPythonScripts\WorkScheduler\scheduler.py
+@py C:\Users\Username\MyPythonScripts\WorkScheduler\run.py
 @pause
