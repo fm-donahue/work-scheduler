@@ -1,6 +1,3 @@
-import sys
-from datetime import datetime, timedelta
-
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.common.exceptions import (NoAlertPresentException,
@@ -13,6 +10,7 @@ from selenium.webdriver.common.alert import Alert
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from webdriver_manager.chrome import ChromeDriverManager
 
 
 class Schedule():
@@ -21,12 +19,12 @@ class Schedule():
     def __init__(self, username, password):
         options = Options()
         options.add_argument('--headless')
-        # options.add_argument('--disable-logging')
+        options.add_argument('--disable-logging')
         options.add_argument('--log-level=3')
         # firefox_profile = webdriver.FirefoxProfile()
         # firefox_profile.set_preference('browser.privatebrowsing.autostart', True)
         # self.browser = webdriver.Firefox(options=options)
-        self.browser = webdriver.Chrome(chrome_options=options) 
+        self.browser = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
         self.username = username
         self.password = password
         self.logged_in = False
@@ -37,7 +35,21 @@ class Schedule():
         try:
             wait = WebDriverWait(self.browser, 10)
             if self.logged_in:
-                self.refresh_tab()            
+                while True:
+                    try:
+                        wait.until(EC.presence_of_element_located((By.ID, 'KSWUSER')))
+                        self.login()
+                        break
+                    except TimeoutException:
+                        try:
+                            wait.until(EC.presence_of_element_located((By.XPATH, '//input[@value="Sign In"][@type="submit"]'))).click()
+                            continue
+                        except TimeoutException:
+                            try:
+                                wait.until(EC.presence_of_element_located((By.ID,'signindiv'))).click()
+                                continue
+                            except TimeoutException:
+                                break
             else:
                 for x in range(5):
                     try:
@@ -51,35 +63,30 @@ class Schedule():
                         self.browser.quit() 
                         return None, None
 
-                # Send credentials to login page
-                euid = self.browser.find_element_by_id('KSWUSER')
-                euid.send_keys(self.username)
-                pwd = self.browser.find_element_by_id('PWD')
-                pwd.send_keys(self.password)
-                self.browser.find_element_by_xpath('//input[@value="I AGREE"][@type="submit"]').click()
+                self.login()
                 self.logged_in = True
                 print('Logged in.')
 
-                while True:
+            while True:
+                try:
+                    wait.until(EC.presence_of_element_located((By.ID, 'tabs')))
+                    break
+
+                # Clicks a button. The cause of this if the session is not yet cleared or deleted
+                # it will go to a page which will continue the last session
+                except TimeoutException:
                     try:
-                        wait.until(EC.presence_of_element_located((By.ID, 'tabs')))
+                        self.browser.find_element_by_id('btnContinue').click()
                         break
+                    except NoSuchElementException:
+                        print('There might be a problem in your network connection or the website.')
+                        self.browser.quit() 
+                        return None, None
 
-                    # Clicks a button. The cause of this if the session is not yet cleared or deleted
-                    # it will go to a page which will continue the last session
-                    except TimeoutException:
-                        try:
-                            self.browser.find_element_by_id('btnContinue').click()
-                            break
-                        except NoSuchElementException:
-                            print('There might be a problem in your network connection or the website.')
-                            self.browser.quit() 
-                            return None, None
-
-                    # Accept alert popups
-                    except UnexpectedAlertPresentException:
-                        self.accept_popups()
-                print('On page home tab.')
+                # Accept alert popups
+                except UnexpectedAlertPresentException:
+                    self.accept_popups()
+            print('On page home tab.')
 
             # Click the schedule tab for table of schedules
             while True: 
@@ -101,6 +108,14 @@ class Schedule():
         except KeyboardInterrupt:
             self.browser_quit()
             return None, None
+
+    def login(self):
+        # Send credentials to login page
+        euid = self.browser.find_element_by_id('KSWUSER')
+        euid.send_keys(self.username)
+        pwd = self.browser.find_element_by_id('PWD')
+        pwd.send_keys(self.password)
+        self.browser.find_element_by_xpath('//input[@value="I AGREE"][@type="submit"]').click()
 
     def accept_popups(self):
         try:
