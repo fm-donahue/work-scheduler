@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 from datetime import datetime
 from tzlocal import get_localzone
 from scheduler import Scheduler
